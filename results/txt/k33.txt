@@ -1,0 +1,8 @@
+Input: examples\k33.txt
+
+Vertices: 6
+Edges: 9
+
+Planar: no
+
+No admissible face for a bridge attached at: 4 5 6
