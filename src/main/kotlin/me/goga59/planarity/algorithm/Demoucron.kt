@@ -5,7 +5,8 @@ import me.goga59.planarity.model.Graph
 import me.goga59.planarity.model.edge
 import java.util.ArrayDeque
 
-// Результат проверки: порядок ребер при успехе или точки примыкания моста при неудаче
+// Результат проверки: порядок ребер при успехе
+// или точки примыкания проблемного фрагмента при неудаче
 data class Embedding(
     val rotation: Map<Int, List<Int>>,
     val faces: List<List<Int>>,
@@ -14,13 +15,16 @@ data class Embedding(
     val isPlanar get() = conflict.isEmpty()
 }
 
-// Мост - отдельное новое ребро или связная группа новых вершин
+// Здесь Bridge - фрагмент относительно уже уложенной части
+// Это отдельное неуложенное ребро или связная группа новых вершин
+// Такой фрагмент не обязательно является ребром-разрезом графа
 private data class Bridge(
     val contacts: Set<Int>,
     val unembeddedVertices: Set<Int> = emptySet(),
     val singleEdge: Edge? = null,
 )
 
+// Фрагмент и номера граней, в которые его можно добавить
 private data class BridgePlacement(
     val bridge: Bridge,
     val admissibleFaces: List<Int>,
@@ -212,6 +216,7 @@ private fun splitFace(face: List<Int>, path: List<Int>): Pair<List<Int>, List<In
     // Поворачиваем список так, чтобы он начинался в первой точке примыкания
     val boundary = face.drop(startIndex) + face.take(startIndex)
     val endIndex = boundary.indexOf(path.last())
+    // Новая цепь входит в границы двух новых граней в противоположных направлениях
     val innerPath = path.drop(1).dropLast(1)
     val firstFace = boundary.take(endIndex + 1) + innerPath.asReversed()
     val secondFace = path + boundary.drop(endIndex + 1)

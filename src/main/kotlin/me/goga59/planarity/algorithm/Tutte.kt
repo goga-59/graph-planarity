@@ -12,7 +12,8 @@ fun tutteLayout(graph: Graph): Map<Int, Point> {
 
     for (component in graph.components()) {
         val vertices = component.sorted()
-        // Для каждой компоненты находим свои координаты, затем переносим ее вправо
+        // Достраиваем отдельную копию компоненты
+        // Временные ребра не меняют исходный граф
         val connected = graph.induced(component)
 
         val local = when (vertices.size) {
