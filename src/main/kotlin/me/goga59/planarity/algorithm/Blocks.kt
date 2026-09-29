@@ -7,6 +7,7 @@ import java.util.ArrayDeque
 
 // Делит граф на двусвязные блоки
 fun blocks(graph: Graph): List<Set<Edge>> {
+    // Время входа показывает, в каком порядке поиск посетил вершины
     val discoveryTime = mutableMapOf<Int, Int>()
 
     // lowLink[v] - самое раннее время входа, достижимое из поддерева вершины v
@@ -24,8 +25,11 @@ fun blocks(graph: Graph): List<Set<Edge>> {
             val currentEdge = edge(vertex, neighbor)
 
             if (neighbor !in discoveryTime) {
+                // Запоминаем ребро до спуска, чтобы потом выделить из стека целый блок
                 edgeStack.addLast(currentEdge)
                 dfs(neighbor, vertex)
+
+                // Учитываем предков, до которых можно добраться через найденное поддерево
                 lowLink[vertex] = minOf(lowLink.getValue(vertex), lowLink.getValue(neighbor))
 
                 // Если из поддерева нельзя попасть к предкам, блок найден
@@ -48,6 +52,7 @@ fun blocks(graph: Graph): List<Set<Edge>> {
         }
     }
 
+    // Начинаем поиск заново для каждой еще не посещенной компоненты
     graph.vertices.sorted().forEach { if (it !in discoveryTime) dfs(it, null) }
     return blocks
 }

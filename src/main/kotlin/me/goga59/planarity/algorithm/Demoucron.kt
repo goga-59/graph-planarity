@@ -43,6 +43,7 @@ fun demoucron(graph: Graph): Embedding {
         val blockVertices = blockEdges.flatMapTo(mutableSetOf()) { listOf(it.u, it.v) }
         val block = Graph(blockVertices, blockEdges.toMutableSet())
 
+        // Пересечения внутри одного блока нельзя устранить укладкой других блоков
         val result = embedBlock(block)
         if (!result.isPlanar) return result
 
@@ -72,6 +73,7 @@ private fun initialCycle(graph: Graph): List<Int> {
                 visit(neighbor, vertex)?.let { return it }
             } else if (depth.getValue(neighbor) < depth.getValue(vertex)) {
                 // Обратное ребро к предку замыкает начальный цикл
+                // Поднимаемся по родителям, чтобы собрать вершины этого цикла
                 val path = mutableListOf(vertex)
 
                 while (path.last() != neighbor) {
@@ -120,6 +122,7 @@ private fun bridges(graph: Graph, embeddedVertices: Set<Int>, embeddedEdges: Set
             graph.neighbors(vertex).filter { it in embeddedVertices }
         }
 
+        // Вершины примыкания определяют, в какие грани можно поместить эту часть
         result += Bridge(contacts, unembeddedVertices = outside)
     }
 
@@ -170,6 +173,7 @@ private fun embedBlock(graph: Graph): Embedding {
     val faces = mutableListOf(cycle, cycle.reversed())
 
     while (embeddedEdges.size < graph.edges.size) {
+        // После каждой новой цепи состав фрагментов и границ меняется, поэтому ищем их заново
         // Мост помещается только в грань, содержащую все его точки примыкания
         val placements = bridges(graph, embeddedVertices, embeddedEdges).map { bridge ->
             val admissibleFaces = faces.indices.filter { index ->
@@ -179,6 +183,7 @@ private fun embedBlock(graph: Graph): Embedding {
             BridgePlacement(bridge, admissibleFaces)
         }
 
+        // Фрагмент с меньшим выбором граней нужно разместить первым
         val (bridge, admissibleFaces) = placements.minBy { it.admissibleFaces.size }
 
         // Если подходящей грани нет, граф непланарен
@@ -204,6 +209,7 @@ private fun embedBlock(graph: Graph): Embedding {
 private fun splitFace(face: List<Int>, path: List<Int>): Pair<List<Int>, List<Int>> {
     // Делим границу в концах новой цепи и получаем две грани
     val startIndex = face.indexOf(path.first())
+    // Поворачиваем список так, чтобы он начинался в первой точке примыкания
     val boundary = face.drop(startIndex) + face.take(startIndex)
     val endIndex = boundary.indexOf(path.last())
     val innerPath = path.drop(1).dropLast(1)
@@ -216,6 +222,7 @@ private fun rotationFromFaces(graph: Graph, faces: List<List<Int>>): Map<Int, Li
     // По обходу граней восстанавливаем порядок соседей каждой вершины
     val successors = graph.vertices.associateWith { mutableMapOf<Int, Int>() }
 
+    // На границе каждой грани запоминаем, какой сосед идет после предыдущего
     for (face in faces) for (index in face.indices) {
         val vertex = face[index]
         successors.getValue(vertex)[face[(index + face.size - 1) % face.size]] = face[(index + 1) % face.size]

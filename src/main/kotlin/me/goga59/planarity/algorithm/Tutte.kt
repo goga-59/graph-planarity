@@ -12,6 +12,7 @@ fun tutteLayout(graph: Graph): Map<Int, Point> {
 
     for (component in graph.components()) {
         val vertices = component.sorted()
+        // Для каждой компоненты находим свои координаты, затем переносим ее вправо
         val connected = graph.induced(component)
 
         val local = when (vertices.size) {
@@ -29,6 +30,7 @@ fun tutteLayout(graph: Graph): Map<Int, Point> {
 }
 
 private fun drawConnected(graph: Graph): Map<Int, Point> {
+    // Дополняем компоненту до графа с треугольными гранями
     completeToMaximalPlanar(graph)
 
     val outerFace = demoucron(graph).faces.firstOrNull { it.size == 3 }
@@ -48,6 +50,7 @@ private fun completeToMaximalPlanar(graph: Graph) {
             if (candidate in graph.edges) continue
 
             // Оставляем новое ребро, только если граф остается планарным
+            // Проверка нужна после каждого добавления, потому что подходящие ребра заранее неизвестны
             graph.edges += candidate
             if (!demoucron(graph).isPlanar) graph.edges -= candidate
         }
@@ -64,6 +67,7 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
 
     val interiorVertices = graph.vertices.sorted().filterNot(boundaryPositions::containsKey)
     val interiorIndex = interiorVertices.withIndex().associate { (i, vertex) -> vertex to i }
+    // Каждая строка задает одну вершину, два последних столбца хранят правые части для координат
     val system = Array(interiorVertices.size) { DoubleArray(interiorVertices.size + 2) }
 
     // Каждая внутренняя вершина должна быть средним координат своих соседей
@@ -76,6 +80,7 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
             val point = boundaryPositions[neighbor]
 
             if (point != null) {
+                // Известные координаты внешней грани сразу переносим в правую часть
                 system[row][interiorVertices.size] += point.x
                 system[row][interiorVertices.size + 1] += point.y
             } else {
@@ -94,6 +99,7 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
         system[column] = system[pivot]
         system[pivot] = rowToSwap
 
+        // Убираем текущую неизвестную из строк ниже
         for (row in column + 1 until interiorVertices.size) {
             val factor = system[row][column] / system[column][column]
             for (cell in column until interiorVertices.size + 2) system[row][cell] -= factor * system[column][cell]
@@ -106,6 +112,7 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
         var x = system[row][interiorVertices.size]
         var y = system[row][interiorVertices.size + 1]
 
+        // Подставляем координаты вершин, найденные на предыдущих шагах обратного хода
         for (column in row + 1 until interiorVertices.size) {
             val point = positions.getValue(interiorVertices[column])
             x -= system[row][column] * point.x
