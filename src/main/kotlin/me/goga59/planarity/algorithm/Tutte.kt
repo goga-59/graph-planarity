@@ -12,8 +12,7 @@ fun tutteLayout(graph: Graph): Map<Int, Point> {
 
     for (component in graph.components()) {
         val vertices = component.sorted()
-        // Достраиваем отдельную копию компоненты
-        // Временные ребра не меняют исходный граф
+        // Дальнейшая триангуляция не должна менять исходный граф
         val connected = graph.induced(component)
 
         val local = when (vertices.size) {
@@ -22,7 +21,6 @@ fun tutteLayout(graph: Graph): Map<Int, Point> {
             else -> drawConnected(connected)
         }
 
-        // Сдвиг по горизонтали отделяет компоненты друг от друга
         local.forEach { (vertex, point) -> positions[vertex] = Point(point.x + offset, point.y) }
         offset += 6.0
     }
@@ -31,27 +29,23 @@ fun tutteLayout(graph: Graph): Map<Int, Point> {
 }
 
 private fun drawConnected(graph: Graph): Map<Int, Point> {
-    // Дополняем компоненту до графа с треугольными гранями
     completeToMaximalPlanar(graph)
 
     val outerFace = demoucron(graph).faces.firstOrNull { it.size == 3 }
         ?: error("Triangulation did not produce a triangular face")
 
-    // Выбранную треугольную грань принимаем за внешнюю
     return barycentricLayout(graph, outerFace)
 }
 
+// Дополняем граф до максимального планарного для укладки Тутте
 private fun completeToMaximalPlanar(graph: Graph) {
     val vertices = graph.vertices.sorted()
 
-    // При четырех и более вершинах максимальный планарный граф 3-связен
     for (i in vertices.indices) {
         for (j in i + 1 until vertices.size) {
             val candidate = edge(vertices[i], vertices[j])
             if (candidate in graph.edges) continue
 
-            // Оставляем новое ребро, только если граф остается планарным
-            // Проверка нужна после каждого добавления, потому что подходящие ребра заранее неизвестны
             graph.edges += candidate
             if (!demoucron(graph).isPlanar) graph.edges -= candidate
         }
@@ -59,7 +53,7 @@ private fun completeToMaximalPlanar(graph: Graph) {
 }
 
 private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Point> {
-    // Вершины внешней грани закрепляем в углах треугольника
+    // Фиксируем внешнюю грань
     val boundaryPositions = mapOf(
         outerFace[0] to Point(0.0, 0.0),
         outerFace[1] to Point(4.0, 0.0),
@@ -71,8 +65,6 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
     // Каждая строка задает одну вершину, два последних столбца хранят правые части для координат
     val system = Array(interiorVertices.size) { DoubleArray(interiorVertices.size + 2) }
 
-    // Каждая внутренняя вершина должна быть средним координат своих соседей
-    // Координаты трех углов известны заранее, поэтому ставим их справа в уравнениях
     interiorVertices.forEachIndexed { row, vertex ->
         val neighbors = graph.neighbors(vertex)
         system[row][row] = neighbors.size.toDouble()
@@ -81,7 +73,6 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
             val point = boundaryPositions[neighbor]
 
             if (point != null) {
-                // Известные координаты внешней грани сразу переносим в правую часть
                 system[row][interiorVertices.size] += point.x
                 system[row][interiorVertices.size + 1] += point.y
             } else {
@@ -90,9 +81,8 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
         }
     }
 
-    // Одним прямым ходом Гаусса обрабатываем обе координаты
     for (column in interiorVertices.indices) {
-        // Берем строку с наибольшим по модулю коэффициентом, чтобы уменьшить ошибку округления
+        // Частичный выбор главного элемента
         val pivot = (column until interiorVertices.size).maxBy { abs(system[it][column]) }
         check(abs(system[pivot][column]) > 1e-12) { "Singular barycentric system" }
 
@@ -100,20 +90,17 @@ private fun barycentricLayout(graph: Graph, outerFace: List<Int>): Map<Int, Poin
         system[column] = system[pivot]
         system[pivot] = rowToSwap
 
-        // Убираем текущую неизвестную из строк ниже
         for (row in column + 1 until interiorVertices.size) {
             val factor = system[row][column] / system[column][column]
             for (cell in column until interiorVertices.size + 2) system[row][cell] -= factor * system[column][cell]
         }
     }
 
-    // Обратным ходом находим координаты внутренних вершин
     val positions = boundaryPositions.toMutableMap()
     for (row in interiorVertices.indices.reversed()) {
         var x = system[row][interiorVertices.size]
         var y = system[row][interiorVertices.size + 1]
 
-        // Подставляем координаты вершин, найденные на предыдущих шагах обратного хода
         for (column in row + 1 until interiorVertices.size) {
             val point = positions.getValue(interiorVertices[column])
             x -= system[row][column] * point.x
